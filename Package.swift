@@ -6,14 +6,17 @@ import PackageDescription
 let package = Package(
     name: "GenerateImageAssets",
     platforms: [
-        .iOS(.v13),
+        .macOS(.v14),
     ],
     products: [
         .library(name: "GenerateImageAssetsLib", targets: ["GenerateImageAssetsLib"]),
         .executable(name: "generate-image-assets", targets: ["GenerateImageAssets"]),
     ],
     targets: [
-        .target(name: "GenerateImageAssetsLib"),
+        .target(
+            name: "GenerateImageAssetsLib",
+            dependencies: []
+        ),
         .executableTarget(
             name: "GenerateImageAssets",
             dependencies: ["GenerateImageAssetsLib"]
