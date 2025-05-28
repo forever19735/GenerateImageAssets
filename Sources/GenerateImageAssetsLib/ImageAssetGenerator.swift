@@ -18,7 +18,6 @@ public struct ImageAssetGenerator {
               let data = fileManager.contents(atPath: contentsPath),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let properties = json["properties"] as? [String: Any] else {
-            print("⚠️ 無法讀取群組 \(groupName) 的 Contents.json，預設為不提供 namespace")
             return false // Default to no namespace if can't read
         }
         
