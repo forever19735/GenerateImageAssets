@@ -19,6 +19,7 @@ This CLI tool scans your `Assets.xcassets` folder and generates an `ImageAsset.s
 - **Flexible Asset Paths**: Generates correct asset paths based on namespace settings
 - **Case Conversion**: Converts snake_case, kebab-case, and space names to camelCase enum cases
 - **Nested Group Support**: Handles grouped images with proper Swift enum extensions
+- **Separated UIKit & SwiftUI Extensions**:  
 
 ---
 
@@ -68,12 +69,12 @@ mint install forever19735/GenerateImageAssets
 ## 🚀 Usage
 
 ```bash
-generate-image-assets --assets <path_to/Assets.xcassets> --output <path_to/ImageAsset.swift>
+generate-image-assets --assets <path_to/Assets.xcassets> --output <path_to/Yourfolder>
 ```
 
 ### Example Command
 ```bash
-generate-image-assets --assets ./MyApp/Assets.xcassets --output ./MyApp/Generated/ImageAsset.swift
+generate-image-assets --assets ./MyApp/Assets.xcassets --output ./MyApp/Generated
 ```
 
 ---
