@@ -15,7 +15,6 @@ This CLI tool scans your `Assets.xcassets` folder and generates an `ImageAsset.s
 - Automatically detects `.imageset` in subfolders  
 - Converts snake_case, kebab-case, and space names to camelCase enum cases  
 - Swift `enum` + `UIImage` extension generation  
-- Easy to integrate in your project or CI pipeline  
 
 ---
 
@@ -37,7 +36,7 @@ generate-image-assets --assets <path_to/Assets.xcassets> --output <path_to/Image
 
 ---
 
-## 💡 Generated Output
+## 💡 Example Output
 
 ```swift
 enum ImageAsset: String {
