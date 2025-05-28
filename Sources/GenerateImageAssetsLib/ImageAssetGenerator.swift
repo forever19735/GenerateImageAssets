@@ -7,32 +7,31 @@ public struct ImageAssetGenerator {
         let rest = components.dropFirst().map { $0.capitalized }
         return ([first] + rest).joined()
     }
-    
-    // Helper function to check if a group provides namespace
+
     public static func checkGroupProvidesNamespace(at assetsPath: String, groupName: String) -> Bool {
-        let groupPath = "\(assetsPath)/\(groupName)"
-        let contentsPath = "\(groupPath)/Contents.json"
+        let contentsPath = "\(assetsPath)/\(groupName)/Contents.json"
         let fileManager = FileManager.default
-        
+
         guard fileManager.fileExists(atPath: contentsPath),
               let data = fileManager.contents(atPath: contentsPath),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let properties = json["properties"] as? [String: Any] else {
-            return false // Default to no namespace if can't read
+            return false
         }
-        
-        let providesNamespace = properties["provides-namespace"] as? Bool ?? false
-        print("📁 群組 \(groupName) provides-namespace: \(providesNamespace)")
-        return providesNamespace
+
+        return properties["provides-namespace"] as? Bool ?? false
     }
 
-    public static func collectImageAssets(from path: String) -> (flat: [String], grouped: [String: (images: [String], providesNamespace: Bool, originalName: String)]) {
+    public static func collectImageAssets(from path: String) -> (
+        flat: [String],
+        grouped: [String: (images: [String], providesNamespace: Bool, originalName: String)]
+    ) {
         var flatImages: [String] = []
         var groupedImages: [String: (images: [String], providesNamespace: Bool, originalName: String)] = [:]
 
         let fileManager = FileManager.default
         guard let enumerator = fileManager.enumerator(atPath: path) else {
-            fatalError("❌ 找不到 Assets.xcassets 資料夾: \(path)")
+            fatalError("❌ Assets.xcassets not found: \(path)")
         }
 
         for case let file as String in enumerator {
@@ -41,13 +40,11 @@ public struct ImageAssetGenerator {
             let components = trimmedPath.split(separator: "/").map(String.init)
 
             if components.count >= 2 {
-                let groupName = components[0]  // 保留原始群組名稱
+                let groupName = components[0]
                 let groupCamelCase = convertToCamelCase(groupName)
                 let imageName = components.last!
-                
-                // Check if this group provides namespace
                 let providesNamespace = checkGroupProvidesNamespace(at: path, groupName: groupName)
-                
+
                 if groupedImages[groupCamelCase] == nil {
                     groupedImages[groupCamelCase] = (images: [], providesNamespace: providesNamespace, originalName: groupName)
                 }
@@ -60,67 +57,109 @@ public struct ImageAssetGenerator {
         return (flatImages, groupedImages)
     }
 
-    public static func generateEnumContent(flatImages: [String], groupedImages: [String: (images: [String], providesNamespace: Bool, originalName: String)]) -> String {
-        var sections: [String] = []
-
-        let flatCases = flatImages.sorted().map {
-            "    case \(convertToCamelCase($0)) = \"\($0)\""
-        }.joined(separator: "\n")
-
-        sections.append("""
+    public static func generateEnumFiles(
+        flatImages: [String],
+        groupedImages: [String: (images: [String], providesNamespace: Bool, originalName: String)]
+    ) -> (baseEnum: String, uikitExt: String, swiftuiExt: String) {
+        // Base Enum
+        var baseEnum = """
         // Auto-generated
-        import UIKit
+        import Foundation
 
         enum ImageAsset: String {
-        \(flatCases)
-        }
+        """
 
-        """)
+        baseEnum += flatImages.sorted().map {
+            "\n    case \(convertToCamelCase($0)) = \"\($0)\""
+        }.joined()
+
+        baseEnum += "\n}\n\n"
 
         for (group, groupData) in groupedImages.sorted(by: { $0.key < $1.key }) {
             let cases = groupData.images.sorted().map { imageName in
-                let assetPath: String
-                if groupData.providesNamespace {
-                    // 使用原始群組名稱（保持大小寫）
-                    assetPath = "\(groupData.originalName)/\(imageName)"
-                } else {
-                    // Use only the image name
-                    assetPath = imageName
-                }
+                let assetPath = groupData.providesNamespace
+                    ? "\(groupData.originalName)/\(imageName)"
+                    : imageName
                 return "        case \(convertToCamelCase(imageName)) = \"\(assetPath)\""
             }.joined(separator: "\n")
 
-            sections.append("""
+            baseEnum += """
             extension ImageAsset {
                 enum \(group.capitalized): String {
             \(cases)
                 }
             }
 
-            """)
+            """
         }
 
-        var imageExtensions: [String] = []
+        // UIKit Extension
+        var uikitExt = """
+        #if canImport(UIKit)
+        import UIKit
 
-        imageExtensions.append("""
         extension UIImage {
             convenience init?(asset: ImageAsset) {
                 self.init(named: asset.rawValue)
             }
         }
-        """)
+        """
 
         for (group, _) in groupedImages {
-            imageExtensions.append("""
+            uikitExt += """
+
             extension UIImage {
                 convenience init?(asset: ImageAsset.\(group.capitalized)) {
                     self.init(named: asset.rawValue)
                 }
             }
-            """)
+            """
         }
 
-        sections.append(imageExtensions.joined(separator: "\n\n"))
-        return sections.joined(separator: "\n")
+        uikitExt += "\n#endif\n"
+
+        // SwiftUI Extension
+        var swiftuiExt = """
+        import SwiftUI
+
+        extension Image {
+            init(asset: ImageAsset) {
+                self.init(asset.rawValue)
+            }
+        }
+        """
+
+        for (group, _) in groupedImages {
+            swiftuiExt += """
+
+            extension Image {
+                init(asset: ImageAsset.\(group.capitalized)) {
+                    self.init(asset.rawValue)
+                }
+            }
+            """
+        }
+
+        swiftuiExt += "\n"
+
+        return (baseEnum, uikitExt, swiftuiExt)
+    }
+
+    public static func writeEnumFiles(
+        assetsPath: String,
+        outputPath: String,
+        fileNames: (base: String, uikit: String, swiftui: String) = ("ImageAsset.swift", "ImageAsset+UIKit.swift", "ImageAsset+SwiftUI.swift")
+    ) {
+        let (flat, grouped) = collectImageAssets(from: assetsPath)
+        let (base, uikit, swiftui) = generateEnumFiles(flatImages: flat, groupedImages: grouped)
+
+        do {
+            try base.write(to: URL(fileURLWithPath: outputPath).appendingPathComponent(fileNames.base), atomically: true, encoding: .utf8)
+            try uikit.write(to: URL(fileURLWithPath: outputPath).appendingPathComponent(fileNames.uikit), atomically: true, encoding: .utf8)
+            try swiftui.write(to: URL(fileURLWithPath: outputPath).appendingPathComponent(fileNames.swiftui), atomically: true, encoding: .utf8)
+            print("✅ 所有 enum 檔案成功寫入：\(outputPath)")
+        } catch {
+            print("❌ 檔案寫入失敗：\(error.localizedDescription)")
+        }
     }
 }

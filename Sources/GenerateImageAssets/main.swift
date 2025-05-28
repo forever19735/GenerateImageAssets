@@ -23,7 +23,7 @@ struct CLIArguments {
         ❌ 使用方式錯誤
 
         正確格式：
-        generate-image-assets --assets <Assets.xcassets 路徑> --output <輸出檔案路徑>
+        generate-image-assets --assets <Assets.xcassets 路徑> --output <輸出資料夾路徑>
         """)
     }
 }
@@ -33,12 +33,32 @@ guard let cli = CLIArguments(from: CommandLine.arguments) else {
     exit(1)
 }
 
-let (flat, grouped) = ImageAssetGenerator.collectImageAssets(from: cli.assetsPath)
-let content = ImageAssetGenerator.generateEnumContent(flatImages: flat, groupedImages: grouped)
+// 收集 image assets
+let (flatImages, groupedImages) = ImageAssetGenerator.collectImageAssets(from: cli.assetsPath)
+
+// 產生三個檔案的內容：base enum、UIKit extension、SwiftUI extension
+let (baseEnumContent, uikitExtensionContent, swiftuiExtensionContent) =
+    ImageAssetGenerator.generateEnumFiles(flatImages: flatImages, groupedImages: groupedImages)
+
+// 建立輸出目錄（如果尚未存在）
+let fileManager = FileManager.default
+try? fileManager.createDirectory(atPath: cli.outputPath, withIntermediateDirectories: true, attributes: nil)
+
+// 定義檔案路徑
+let baseEnumPath = "\(cli.outputPath)/ImageAsset.swift"
+let uikitExtensionPath = "\(cli.outputPath)/ImageAsset+UIKit.swift"
+let swiftuiExtensionPath = "\(cli.outputPath)/ImageAsset+SwiftUI.swift"
 
 do {
-    try content.write(toFile: cli.outputPath, atomically: true, encoding: .utf8)
-    print("✅ 成功產生 ImageAsset.swift → \(cli.outputPath)")
+    try baseEnumContent.write(toFile: baseEnumPath, atomically: true, encoding: .utf8)
+    try uikitExtensionContent.write(toFile: uikitExtensionPath, atomically: true, encoding: .utf8)
+    try swiftuiExtensionContent.write(toFile: swiftuiExtensionPath, atomically: true, encoding: .utf8)
+
+    print("✅ 成功產生 ImageAsset 檔案：")
+    print("  • \(baseEnumPath)")
+    print("  • \(uikitExtensionPath)")
+    print("  • \(swiftuiExtensionPath)")
 } catch {
     print("❌ 寫入失敗：\(error)")
+    exit(1)
 }
