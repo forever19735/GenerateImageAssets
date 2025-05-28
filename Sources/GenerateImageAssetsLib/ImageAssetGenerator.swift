@@ -7,10 +7,29 @@ public struct ImageAssetGenerator {
         let rest = components.dropFirst().map { $0.capitalized }
         return ([first] + rest).joined()
     }
+    
+    // Helper function to check if a group provides namespace
+    public static func checkGroupProvidesNamespace(at assetsPath: String, groupName: String) -> Bool {
+        let groupPath = "\(assetsPath)/\(groupName)"
+        let contentsPath = "\(groupPath)/Contents.json"
+        let fileManager = FileManager.default
+        
+        guard fileManager.fileExists(atPath: contentsPath),
+              let data = fileManager.contents(atPath: contentsPath),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let properties = json["properties"] as? [String: Any] else {
+            print("⚠️ 無法讀取群組 \(groupName) 的 Contents.json，預設為不提供 namespace")
+            return false // Default to no namespace if can't read
+        }
+        
+        let providesNamespace = properties["provides-namespace"] as? Bool ?? false
+        print("📁 群組 \(groupName) provides-namespace: \(providesNamespace)")
+        return providesNamespace
+    }
 
-    public static func collectImageAssets(from path: String) -> (flat: [String], grouped: [String: [String]]) {
+    public static func collectImageAssets(from path: String) -> (flat: [String], grouped: [String: (images: [String], providesNamespace: Bool, originalName: String)]) {
         var flatImages: [String] = []
-        var groupedImages: [String: [String]] = [:]
+        var groupedImages: [String: (images: [String], providesNamespace: Bool, originalName: String)] = [:]
 
         let fileManager = FileManager.default
         guard let enumerator = fileManager.enumerator(atPath: path) else {
@@ -23,9 +42,17 @@ public struct ImageAssetGenerator {
             let components = trimmedPath.split(separator: "/").map(String.init)
 
             if components.count >= 2 {
-                let group = convertToCamelCase(components[0])
-                let name = components.last!
-                groupedImages[group, default: []].append(name)
+                let groupName = components[0]  // 保留原始群組名稱
+                let groupCamelCase = convertToCamelCase(groupName)
+                let imageName = components.last!
+                
+                // Check if this group provides namespace
+                let providesNamespace = checkGroupProvidesNamespace(at: path, groupName: groupName)
+                
+                if groupedImages[groupCamelCase] == nil {
+                    groupedImages[groupCamelCase] = (images: [], providesNamespace: providesNamespace, originalName: groupName)
+                }
+                groupedImages[groupCamelCase]?.images.append(imageName)
             } else if components.count == 1 {
                 flatImages.append(components[0])
             }
@@ -34,7 +61,7 @@ public struct ImageAssetGenerator {
         return (flatImages, groupedImages)
     }
 
-    public static func generateEnumContent(flatImages: [String], groupedImages: [String: [String]]) -> String {
+    public static func generateEnumContent(flatImages: [String], groupedImages: [String: (images: [String], providesNamespace: Bool, originalName: String)]) -> String {
         var sections: [String] = []
 
         let flatCases = flatImages.sorted().map {
@@ -51,9 +78,17 @@ public struct ImageAssetGenerator {
 
         """)
 
-        for (group, images) in groupedImages.sorted(by: { $0.key < $1.key }) {
-            let cases = images.sorted().map {
-                "        case \(convertToCamelCase($0)) = \"\($0)\""
+        for (group, groupData) in groupedImages.sorted(by: { $0.key < $1.key }) {
+            let cases = groupData.images.sorted().map { imageName in
+                let assetPath: String
+                if groupData.providesNamespace {
+                    // 使用原始群組名稱（保持大小寫）
+                    assetPath = "\(groupData.originalName)/\(imageName)"
+                } else {
+                    // Use only the image name
+                    assetPath = imageName
+                }
+                return "        case \(convertToCamelCase(imageName)) = \"\(assetPath)\""
             }.joined(separator: "\n")
 
             sections.append("""
