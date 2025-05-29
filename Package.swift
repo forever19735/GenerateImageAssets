@@ -5,12 +5,13 @@ import PackageDescription
 
 let package = Package(
     name: "GenerateImageAssets",
-    platforms: [
-        .macOS(.v14),
-    ],
+    platforms: [.macOS(.v13)],
     products: [
-        .library(name: "GenerateImageAssetsLib", targets: ["GenerateImageAssetsLib"]),
         .executable(name: "generate-image-assets", targets: ["GenerateImageAssets"]),
+        .library(name: "GenerateImageAssetsLib", targets: ["GenerateImageAssetsLib"]),
+    ],
+    dependencies: [
+        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.2.2")
     ],
     targets: [
         .target(
@@ -19,7 +20,15 @@ let package = Package(
         ),
         .executableTarget(
             name: "GenerateImageAssets",
-            dependencies: ["GenerateImageAssetsLib"]
+            dependencies: [
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                "GenerateImageAssetsLib"
+            ]
         ),
+        .testTarget(
+            name: "GenerateImageAssetsLibTests",
+            dependencies: ["GenerateImageAssetsLib"]
+        )
     ]
 )
+
