@@ -9,7 +9,7 @@ struct GenerateImageAssets: ParsableCommand {
     )
 
     @Option(name: [.short, .long], help: "Path to your .xcassets folder.")
-    var assetsPath: String
+    var assets: String
 
     @Option(name: [.short, .long], help: "Output directory for generated .swift files.")
     var output: String
@@ -20,11 +20,11 @@ struct GenerateImageAssets: ParsableCommand {
     func validate() throws {
         let fileManager = FileManager.default
 
-        guard fileManager.fileExists(atPath: assetsPath) else {
-            throw ValidationError("❌ Assets path does not exist: \(assetsPath)")
+        guard fileManager.fileExists(atPath: assets) else {
+            throw ValidationError("❌ Assets path does not exist: \(assets)")
         }
 
-        guard assetsPath.hasSuffix(".xcassets") else {
+        guard assets.hasSuffix(".xcassets") else {
             throw ValidationError("❌ Must provide a valid .xcassets folder.")
         }
 
@@ -36,10 +36,10 @@ struct GenerateImageAssets: ParsableCommand {
 
     func run() throws {
         if verbose {
-            print("🔍 Scanning: \(assetsPath)")
+            print("🔍 Scanning: \(assets)")
         }
 
-        let rootNode = ImageAssetGenerator.collectImageAssets(from: assetsPath)
+        let rootNode = ImageAssetGenerator.collectImageAssets(from: assets)
 
         if verbose {
             print("📊 Structure:")
